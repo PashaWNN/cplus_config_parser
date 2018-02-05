@@ -4,7 +4,7 @@
 Okay, I'm recently started to learn C++ language and first problem I encountered when I was writing my little pet-project is to effectively store and read settings of my software, so I decided to make very simple and lightweight library for saving and reading data from configuration files. That's it.
 
 ## Ok, how can I use it in my project?
-First of all, add pwnn_config_parser.* files to your project. Then `#include pwnn_config_parser.h`. Also you can add macro for easier access to CPP methods as shown in example.cpp
+First of all, add pwnn_config_parser.* files to your project. Then `#include pwnn_config_parser.h`. Also you can add macro for easier access to CCP methods as shown in example.cpp
 
 After that you're ready to use parser. Load your configuration file with LoadConfig method
 ```$xslt
