@@ -4,99 +4,161 @@
 #include <iostream>
 #include <fstream>
 
-    void pwnn_config_parser::LoadConfig(string fn) {
-        ifstream file(fn);
-        string str;
-        while(getline(file, str)) {
-            Push(str); //Parse line
+
+void pwnn_config_parser::LoadConfig(string fn) {
+    ifstream file(fn);
+    string str;
+    while (getline(file, str)) {
+        Push(str); //Parse line
+    }
+}
+
+void pwnn_config_parser::Push(string str) {
+    std::regex var("^(bool|string|int|float) ([A-Za-z]+):(.+)");
+    std::regex arr("^array (bool|string|int|float) ([A-Za-z]+):(.+;)");
+    std::smatch m;
+    if (std::regex_match(str, m, var)) {
+        string valType = m[1];
+        string Name = m[2];
+        string Value = m[3];
+        SetVar(Name, valType, Value);
+    } else if (std::regex_match(str, m, arr)) {
+        string valType = m[1]; //TODO: multiline arrays reading
+        string Name = m[2];
+        string Value = m[3];
+        SetArray(Name, valType, Value);
+    }
+}
+
+void pwnn_config_parser::SaveConfig(string fn) {
+    ofstream file;
+    file.open(fn);
+    for (auto &i: Strings) {
+        file << "string " << i.first << ":" << i.second << endl;
+    }
+    for (auto &i: Floats) {
+        file << "float " << i.first << ":" << i.second << endl;
+    }
+    for (auto &i: Integers) {
+        file << "int " << i.first << ":" << i.second << endl;
+    }
+    for (auto &i: Booleans) {
+        file << "bool " << i.first << ":" << i.second << endl;
+    }
+    for (auto &i: StringArrays) {
+        file << "array string " << i.first << ":" << array_to_string(i.second) << endl;
+    }
+    for (auto &i: IntegerArrays) {
+        file << "array int " << i.first << ":" << array_to_string(i.second) << endl;
+    }
+    for (auto &i: FloatArrays) {
+        file << "array float " << i.first << ":" << array_to_string(i.second) << endl;
+    }
+    for (auto &i: BooleanArrays) {
+        file << "array bool " << i.first << ":" << array_to_string(i.second) << endl;
+    }
+    file.close();
+}
+
+void pwnn_config_parser::SetArray(string key, string valType, string values) {
+    vector<string> vals;
+    string buffer;
+    for (char value : values) {
+        if (value != ';') {
+            buffer += value;
+        } else {
+            vals.push_back(buffer);
+            buffer = "";
         }
     }
-    
-    void pwnn_config_parser::Push(string str) {
-        std::regex re("^(bool|string|int|float) ([A-Za-z]+):(.+)");
-        std::smatch m;
-        if (std::regex_match(str, m, re)) {
-            string valType = m[1];
-            string Name = m[2];
-            string Value = m[3];
-            if (valType == "bool") {
-                if (Value == "true") {
-                    SetBool(Name, true);
-                } else
-                    if (Value == "false") {
-                        SetBool(Name, false);
-                    }
-            } else
-                if (valType == "string") {
-                    SetString(Name, Value);
-                } else
-                    if (valType == "int") {
-                        try {
-                        SetInt(Name, std::stoi(Value));
-                        }
-                        catch (const std::invalid_argument& ia) {}
-                    } else
-                        if (valType == "float") {
-                            try {
-                            SetFloat(Name, std::stof(Value));
-                            }
-                            catch (const std::invalid_argument& ia) {}
-                        }
-        }
-    }
-    
-    void pwnn_config_parser::SaveConfig(string fn) {
-        ofstream file;
-        file.open(fn);
-        for(auto& i: Strings) {
-            file << "string " << i.first << ":" << i.second << endl;
-        }
-        for(auto& i: Floats) {
-            file << "float " << i.first << ":" << i.second << endl;
-        }
-        for(auto& i: Integers) {
-            file << "int " << i.first << ":" << i.second << endl;
-        }
-        for(auto& i: Booleans) {
-            std::string boolean;
-            if (i.second) {
-                boolean = "true";
-            } else {
-                boolean = "false";
+    switch (string_to_type(valType)) {
+        case TYPE_STRING:
+            SetStringArray(key, vals);
+        case TYPE_INT: {
+            vector<int> arr;
+            for (const auto &val : vals) {
+                try {
+                    arr.push_back(stoi(val));
+                }
+                catch (const std::invalid_argument &ia) {}
             }
-            file << "bool " << i.first << ":" << boolean << endl;
+            SetIntArray(key, arr);
         }
-        file.close();
+        case TYPE_FLOAT: {
+            vector<float> arr;
+            for (const auto &val : vals) {
+                try {
+                    arr.push_back(stof(val));
+                }
+                catch (const std::invalid_argument &ia) {}
+            }
+            SetFloatArray(key, arr);
+        }
+        case TYPE_BOOL: {
+            vector<bool> arr;
+            for (const auto &val : vals) {
+                if (val == "1") {
+                    arr.push_back(true);
+                } else if (val == "0") {
+                    arr.push_back(false);
+                }
+            }
+            SetBoolArray(key, arr);
+        }
     }
-    
-    string pwnn_config_parser::GetString(string key) {
-        return Strings[key];
+}
+
+void pwnn_config_parser::SetVar(string key, string valType, string value) {
+    switch (string_to_type(valType)) {
+        case TYPE_BOOL: {
+            if (value == "1") {
+                SetBool(key, true);
+            } else if (value == "0") {
+                SetBool(key, false);
+            }
+        }
+        case TYPE_STRING:
+            SetString(key, value);
+        case TYPE_INT: {
+            try {
+                SetInt(key, std::stoi(value));
+            }
+            catch (const std::invalid_argument &ia) {}
+        }
+        case TYPE_FLOAT: {
+            try {
+                SetFloat(key, std::stof(value));
+            }
+            catch (const std::invalid_argument &ia) {}
+        }
     }
-    
-    int pwnn_config_parser::GetInt(string key) {
-        return Integers[key];
+}
+
+int pwnn_config_parser::string_to_type(string type) {
+    if (type == "string") {
+        return TYPE_STRING;
+    } else if (type == "float") {
+        return TYPE_FLOAT;
+    } else if (type == "bool") {
+        return TYPE_BOOL;
+    } else if (type == "int") {
+        return TYPE_INT;
+    } else return TYPE_UNKNOWN;
+}
+
+string pwnn_config_parser::array_to_string(vector<string> arr) {
+    string str;
+    for (unsigned i = 0; i < arr.size(); i++) {
+        str += arr[i] + ";";
     }
-    
-    bool pwnn_config_parser::GetBool(string key) {
-        return Booleans[key];
+    return str;
+}
+
+template<class T>
+string pwnn_config_parser::array_to_string(const vector<T> &arr) {
+    string str;
+    for (unsigned i; i < arr.size(); i++) {
+        str += to_string(arr[i]) + ";";
     }
-    
-    float pwnn_config_parser::GetFloat(string key) {
-        return Floats[key];
-    }
-    
-    void pwnn_config_parser::SetString(string key, string value) {
-        Strings[key] = value;
-    }
-    
-    void pwnn_config_parser::SetInt(string key, int value) {
-        Integers[key] = value;
-    }
-    
-    void pwnn_config_parser::SetBool(string key, bool value) {
-        Booleans[key] = value;
-    }
-    
-    void pwnn_config_parser::SetFloat(string key, float value) {
-        Floats[key] = value;
-    }
+    return str;
+}
